@@ -39,6 +39,16 @@ jobs:
           python-version: '3.14'
           architecture: x64
 
+      - name: Use a canonical temporary directory
+        run: |
+          # Hosted Windows TEMP can contain the 8.3 alias RUNNER~1. The tests
+          # compare paths with paths resolved by the application and subprocesses.
+          $testTemp = python -c "import os,pathlib; print(pathlib.Path(os.environ['RUNNER_TEMP']).resolve() / 'vtgui-tests')"
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve temporary directory' }
+          New-Item -ItemType Directory -Force -Path $testTemp | Out-Null
+          "TEMP=$testTemp" >> $env:GITHUB_ENV
+          "TMP=$testTemp" >> $env:GITHUB_ENV
+
       - name: Read and validate version
         id: version
         run: |

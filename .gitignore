@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.spec
+*.db
+*.db-shm
+*.db-wal
+.qa/
+.tools/
+.env
+.env.*
+!.env.example
+*.log
+instance.lock

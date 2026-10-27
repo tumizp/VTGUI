@@ -1,0 +1,10 @@
+Generation mode: built-in image_gen
+
+Use case: logo-brand
+Asset type: final square Windows desktop application logo for VTGUI, an independent command execution and scheduled-task workbench for DRMLAB.
+Primary request: Design one polished, original 1:1 application logo, 1024 by 1024 pixels. A bold geometric V monogram built from two beautifully balanced solid angular ribbon strokes, subtly integrating a small forward/play triangle into its negative space to suggest running tasks and automation. The silhouette must be immediately readable at small desktop icon sizes. Confident minimal contemporary software identity.
+Scene/backdrop: uniform very dark midnight navy square canvas, full bleed, no external frame.
+Composition: one centered large symbol occupying approximately 68 percent of the square, generous balanced breathing room, straight-on orthographic view.
+Style: precise flat vector-like graphic, crisp clean edges, strong silhouette, restrained cyan-to-teal gradient on the V, no excessive ornament. Subtle premium visual refinement; simple enough to reproduce as a single-color mark.
+Text: no text, no letters other than the abstract V-shaped symbol, no wordmark, no tagline.
+Constraints: a single finished logo only; exactly square; no mockup, no presentation sheet, no multiple variants, no watermark, no border, no tiny details, no clocks, no gears, no terminal window, no circuit lines, no 3D bevels, no neon glow, no drop shadows.

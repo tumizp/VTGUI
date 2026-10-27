@@ -112,13 +112,14 @@ jobs:
           build_tag="build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           package_name="${GITHUB_REPOSITORY#*/}"
           package_api="/users/$GITHUB_REPOSITORY_OWNER/packages/container/${package_name,,}"
-          if visibility="$(gh api "$package_api" --jq .visibility 2>package-access-error.txt)"; then
+          access_error="$(mktemp)"
+          if visibility="$(gh api "$package_api" --jq .visibility 2>"$access_error")"; then
             if [[ "$visibility" != private ]]; then
               echo 'Refusing to upload Windows files to an existing non-private package' >&2
               exit 1
             fi
-          elif ! grep -q 'HTTP 404' package-access-error.txt; then
-            cat package-access-error.txt >&2
+          elif ! grep -q 'HTTP 404' "$access_error"; then
+            cat "$access_error" >&2
             exit 1
           fi
           printf '%s' "$GH_TOKEN" | oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin

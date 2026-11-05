@@ -4,7 +4,7 @@
 
 ## 启动
 
-**安装包（推荐分享）**：将 `dist/VTGUI-1.8.0-Setup-x64.exe` 发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
+**安装包（推荐分享）**：从 [GitHub Releases](https://github.com/tumizp/VTGUI/releases/latest) 下载 `VTGUI-1.8.1-Setup-x64.exe`，发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
 
 安装包只含 GUI 和运行库，不含分享者的配置、日志、定时任务或 DRMLAB。DRMLAB 及其依赖仍需自行准备。升级前先正常退出 GUI，运行新安装包即可覆盖安装；从 Windows“已安装的应用”或开始菜单卸载，均保留 `%LOCALAPPDATA%\VTGUI` 中的配置和日志，不删除 DRMLAB 及下载文件。安装包未进行数字签名。
 
@@ -234,9 +234,9 @@ python main.py --data-dir E:\VTGUI-Data
 
 推送到 `main`、提交面向 `main` 的 Pull Request，或在 Actions 中手动运行 **Windows packages and GHCR archive**，会在 Windows x64 上执行源码/UI 测试、构建程序与离线安装包、验证打包程序，以及验证安装、升级和卸载。全部通过后，Actions 的 Artifacts 提供安装包、便携 ZIP、构建信息与 SHA-256 校验文件，保留 30 天。
 
-`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.8.0`、`1.8.0` 这样的归档标签，以及附带下载文件的 GitHub Release。标签必须与 `pyproject.toml` 中的版本一致。
+`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.8.1`、`1.8.1` 这样的归档标签，以及附带下载文件的 GitHub Release。普通 `main` 构建不会发布到 Releases；正式发布需推送与 `pyproject.toml` 版本一致的标签。
 
-GHCR 中保存的是 Windows 文件的 OCI 归档，使用 ORAS 取回后在 Windows 运行。仓库保持私有；新 GHCR 包默认私有，并通过来源标注关联仓库。流水线使用自动提供的 `GITHUB_TOKEN`，无需另配上传密钥。私有归档的本机下载需要有包读取权限的 GitHub 登录及 `read:packages` 令牌：
+GHCR 中保存的是 Windows 文件的 OCI 归档，使用 ORAS 取回后在 Windows 运行。源码和正式版本安装包通过公开仓库及 Releases 提供；GHCR 归档保持私有，并通过来源标注关联仓库。流水线使用自动提供的 `GITHUB_TOKEN`，无需另配上传密钥。私有归档的本机下载需要有包读取权限的 GitHub 登录及 `read:packages` 令牌：
 
 ```powershell
 # 先设置 GHCR_TOKEN 环境变量；不要将令牌写入源码或提交到 Git。
@@ -244,11 +244,11 @@ $env:GHCR_TOKEN | oras login ghcr.io --username <GitHub用户名> --password-std
 oras pull ghcr.io/<GitHub用户名>/<小写仓库名>:latest --output .\VTGUI-download
 ```
 
-发布新版时，先修改 `pyproject.toml` 中的三段数字版本并提交，再推送匹配标签，例如：
+发布新版时，先同步修改 `pyproject.toml` 和 `vtgui/__init__.py` 中的三段数字版本并提交，再推送匹配标签，例如：
 
 ```powershell
-git tag v1.8.0
-git push origin v1.8.0
+git tag v1.8.1
+git push origin v1.8.1
 ```
 
 每次构建的 Actions 摘要会列出实际 GHCR 引用和已校验的 digest。可使用 `@sha256:...` 引用取回该次构建的确定版本。便携 ZIP 解压后运行 `VTGUI/VTGUI.exe`，保留整个文件夹。

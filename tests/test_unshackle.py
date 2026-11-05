@@ -95,10 +95,10 @@ class UnshackleTests(unittest.TestCase):
 
     def test_markers_outside_configured_source_do_not_expand_move(self):
         run, source = self.run_fixture(outside=True)
-        self.assertEqual(run["status"], "completed")
+        self.assertEqual(run["status"], "failed")
         self.assertFalse((self.root / "library").exists())
         self.assertTrue((source / "Example.S01/Example.S01E01.mkv").exists())
-        self.assertIn("没有可确认的新成品", run["message"])
+        self.assertEqual(run["message"], "退出码 0；当前集未更新")
 
     def test_failed_download_with_markers_does_not_move(self):
         run, source = self.run_fixture(code=7)

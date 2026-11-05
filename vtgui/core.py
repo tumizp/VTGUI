@@ -930,7 +930,7 @@ class Engine:
                             action = "先重命名后移动" if rename_enabled(job) and job["move_enabled"] else "重命名" if rename_enabled(job) else "移动"
                             message += f"；{action} {count}/{total} 个项目，详见日志"
                         else:
-                            message += "；没有可确认的新成品"
+                            status, message = "failed", message + "；当前集未更新"
                         if self.cancel_event.is_set():
                             status, message = "cancelled", message + "；归档阶段取消"
                 log(f"\n[{stamp()}] {STATUSES[status]} · {message}\n")

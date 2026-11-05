@@ -195,6 +195,27 @@ class CoreTests(unittest.TestCase):
         self.assertTrue((source / "failed.mkv").exists())
         self.assertFalse((self.base / "library").exists())
 
+    def test_no_new_output_is_failure(self):
+        source = self.root / "downloads"
+        source.mkdir()
+        old = source / "previous.mkv"
+        old.write_bytes(b"previous")
+        for options in ({"move_enabled": True, "move_mode": "files"},
+                        {"move_enabled": True, "move_mode": "folders"},
+                        {"rename_season": "+1"}):
+            with self.subTest(options=options):
+                ident = self.engine.submit(self.job("print('Processed all titles!')",
+                                                    destination=str(self.base / "library"), **options))
+                self.engine._run(ident)
+                run = self.store.run(ident)
+                self.assertEqual(run["status"], "failed")
+                self.assertEqual(run["code"], 0)
+                self.assertEqual(run["message"], "退出码 0；当前集未更新")
+                log = (self.store.logs / f"{ident}.log").read_text(encoding="utf-8")
+                self.assertIn("失败 · 退出码 0；当前集未更新", log)
+                self.assertEqual(old.read_bytes(), b"previous")
+                self.assertFalse((self.base / "library").exists())
+
     def test_move_collision_and_path_escape(self):
         source = self.root / "downloads"
         source.mkdir()

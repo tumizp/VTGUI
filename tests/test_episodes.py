@@ -225,6 +225,30 @@ class EpisodeTests(unittest.TestCase):
         self.assertFalse((self.root / "attempt-02").exists())
         self.assertEqual(self.store.episode_progress(spec), 1)
 
+    def test_missing_episode_retries_without_advancing(self):
+        argv = [sys.executable, "-u", "-c",
+                "print('Episode {episode}'); print('Titles : Total Episodes: 20'); print('IQIYI : Processed all titles!')"]
+        spec = self.spec(episode_start="22", episode_total=24, episodes_per_trigger=3)
+        spec["job"].update(argv=argv, command=subprocess.list2cmdline(argv),
+                           move_enabled=True, destination=str(self.root / "library"), retries=1, retry_delay=1)
+        ident = self.store.save_schedule(spec)
+        spec = self.store.schedules()[0]
+        first = self.engine.submit_schedule(ident)
+        self.engine._run(first)
+        self.assertEqual(self.store.run(first)["status"], "failed")
+        self.assertEqual(self.store.run(first)["message"], "退出码 0；当前集未更新")
+        self.assertEqual(self.store.episode_progress(spec), 22)
+        retry = self.queued()[0]
+        self.assertEqual((retry["episode"], retry["attempt"]), (22, 1))
+        self.engine._run(retry["id"])
+        self.assertFalse(self.queued())
+        self.assertEqual(self.store.episode_progress(spec), 22)
+        runs = self.store.rows("SELECT status,code,episode FROM runs ORDER BY rowid")
+        self.assertEqual([(r["status"], r["code"], r["episode"]) for r in runs],
+                         [("failed", 0, 22), ("failed", 0, 22)])
+        resumed = self.engine.submit_schedule(ident)
+        self.assertEqual(self.store.run(resumed)["episode"], 22)
+
     def test_cancel_running_episode_stops_sequence(self):
         spec = self.real_spec("import time; print('{episode}', flush=True); time.sleep(30)", episodes_per_trigger=3)
         first = self.engine.submit_schedule(spec["id"])

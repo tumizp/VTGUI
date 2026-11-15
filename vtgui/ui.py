@@ -539,9 +539,24 @@ class App(tk.Tk):
         button(tools, "启用 / 暂停", self.toggle_schedule).pack(side="left")
         button(tools, "立即执行", self.run_schedule).pack(side="left", padx=9)
         button(tools, "删除", self.delete_schedule).pack(side="right")
+        filters = tk.Frame(page, bg=BG)
+        filters.pack(fill="x", pady=(0, 10))
+        self.schedule_search = tk.StringVar()
+        label(filters, "搜索任务名称", color=MUTED).pack(side="left", padx=(0, 8))
+        entry(filters, self.schedule_search, width=24).pack(side="left")
+        days = tk.Frame(page, bg=BG)
+        days.pack(fill="x", pady=(0, 10))
+        label(days, "执行周期", color=MUTED).pack(side="left", padx=(0, 8))
+        self.schedule_days = [tk.BooleanVar() for _ in WEEK]
+        for name, selected in zip(WEEK, self.schedule_days):
+            check(days, name, selected, self.refresh_schedules).pack(side="left")
+        self.schedule_sort = None
+        self.schedule_descending = False
         holder, self.schedules_tree = self.tree(page, [("name", "任务名称"), ("cycle", "执行周期"), ("time", "执行时间"), ("episodes", "集数进度 / 每轮"), ("next", "下次执行"), ("status", "状态")], [170, 140, 200, 175, 125, 80])
         holder.pack(fill="both", expand=True)
-        self.schedules_tree.bind("<Double-1>", lambda e: self.edit_schedule())
+        self.schedules_tree.bind("<Double-1>", self.schedule_double_click)
+        self.schedule_search.trace_add("write", lambda *_: self.refresh_schedules())
+        self.update_schedule_headings()
         tips = card(page)
         tips.pack(fill="x", pady=(16, 0))
         label(tips, "调度说明", 11, ACCENT).pack(anchor="w", padx=18, pady=(14, 5))
@@ -927,8 +942,41 @@ class App(tk.Tk):
         counts = {r["status"]: r["n"] for r in self.store.rows("SELECT status,COUNT(*) n FROM runs GROUP BY status")}
         for key, widget in self.counts.items():
             widget.configure(text=str(counts.get(key, 0)))
+        self.refresh_schedules()
+        events = self.store.rows("SELECT * FROM events ORDER BY id DESC LIMIT 300")
+        self.sync_tree(self.events_tree, [(r["id"], (r["time"][5:19].replace("T", " "), r["source"], STATUSES.get(r["status"], r["status"]), r["message"]), r["status"]) for r in events])
+        self.monitor_var.set(settings["monitor_enabled"])
+        self.monitor_caption.configure(text=f"{'● 正在监听' if settings['monitor_enabled'] else '○ 历史监听已关闭'}  ·  {resolved(root, settings['history_file']) if root else '请先选择项目目录'}\n失败重试 {settings['retries']} 次 / 间隔 {settings['retry_delay']} 秒  ·  自动移动仅由定时任务单独配置")
+
+    def schedule_double_click(self, event):
+        if self.schedules_tree.identify_row(event.y):
+            self.edit_schedule()
+
+    def sort_schedules(self, column):
+        self.schedule_descending = self.schedule_sort == column and not self.schedule_descending
+        self.schedule_sort = column
+        self.update_schedule_headings()
+        self.refresh_schedules()
+
+    def update_schedule_headings(self):
+        for column, title in (("cycle", "执行周期"), ("time", "执行时间")):
+            if self.schedule_sort == column:
+                title += " ▼" if self.schedule_descending else " ▲"
+            self.schedules_tree.heading(column, text=title, command=lambda key=column: self.sort_schedules(key))
+
+    def refresh_schedules(self):
+        query = self.schedule_search.get().strip().casefold()
+        days = {day for day, selected in enumerate(self.schedule_days) if selected.get()}
+        schedules = [
+            spec for spec in self.store.schedules()
+            if query in spec["job"]["name"].casefold() and (not days or days.intersection(spec["days"]))
+        ]
+        if self.schedule_sort == "cycle":
+            schedules.sort(key=lambda spec: tuple(sorted(spec["days"])), reverse=self.schedule_descending)
+        elif self.schedule_sort == "time":
+            schedules.sort(key=lambda spec: tuple(schedule_times(spec)), reverse=self.schedule_descending)
         records = []
-        for spec in self.store.schedules():
+        for spec in schedules:
             cycle = "每天" if len(spec["days"]) == 7 else "、".join(WEEK[d] for d in spec["days"])
             progress = self.store.episode_progress(spec)
             exhausted = progress is not None and progress > int(spec.get("episode_total", 1))
@@ -939,10 +987,6 @@ class App(tk.Tk):
                            episode_text, next_occurrence(spec).strftime("%m-%d %H:%M") if spec["enabled"] and not exhausted else "—",
                            "全部完成" if exhausted else "已启用" if spec["enabled"] else "已暂停"), "completed" if spec["enabled"] else ""))
         self.sync_tree(self.schedules_tree, records)
-        events = self.store.rows("SELECT * FROM events ORDER BY id DESC LIMIT 300")
-        self.sync_tree(self.events_tree, [(r["id"], (r["time"][5:19].replace("T", " "), r["source"], STATUSES.get(r["status"], r["status"]), r["message"]), r["status"]) for r in events])
-        self.monitor_var.set(settings["monitor_enabled"])
-        self.monitor_caption.configure(text=f"{'● 正在监听' if settings['monitor_enabled'] else '○ 历史监听已关闭'}  ·  {resolved(root, settings['history_file']) if root else '请先选择项目目录'}\n失败重试 {settings['retries']} 次 / 间隔 {settings['retry_delay']} 秒  ·  自动移动仅由定时任务单独配置")
 
     def pump(self):
         if self.closing:

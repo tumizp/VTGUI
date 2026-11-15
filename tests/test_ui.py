@@ -74,6 +74,40 @@ class UITests(unittest.TestCase):
         editor.save()
         self.assertEqual(self.store.schedules()[0]["job"]["move_mode"], "files")
 
+    def test_schedule_search_filter_and_sort(self):
+        schedules = [
+            {"id": "monday", "job": {"name": "News AM"}, "days": [0], "time": "11:00", "enabled": False},
+            {"id": "friday", "job": {"name": "News PM"}, "days": [4], "time": "10:00",
+             "extra_times": ["08:00"], "enabled": False},
+            {"id": "daily", "job": {"name": "Daily news"}, "days": list(range(7)), "time": "12:00", "enabled": False},
+            {"id": "tuesday", "job": {"name": "News"}, "days": [1], "time": "07:00", "enabled": False},
+            {"id": "sports", "job": {"name": "Sports"}, "days": [0], "time": "09:00", "enabled": False},
+        ]
+        app = self.app
+        children = app.schedules_tree.get_children
+        try:
+            with patch.object(self.store, "schedules", return_value=schedules):
+                app.schedule_days[0].set(True)
+                app.schedule_days[4].set(True)
+                app.schedule_search.set(" NEWS ")
+                self.assertEqual(children(), ("monday", "friday", "daily"))
+                app.sort_schedules("time")
+                self.assertEqual(children(), ("friday", "monday", "daily"))
+                app.sort_schedules("time")
+                app.refresh()
+                self.assertEqual(children(), ("daily", "monday", "friday"))
+                app.sort_schedules("cycle")
+                self.assertEqual(children(), ("monday", "daily", "friday"))
+                app.sort_schedules("cycle")
+                self.assertEqual(children(), ("friday", "daily", "monday"))
+        finally:
+            app.schedule_sort = None
+            app.schedule_descending = False
+            app.update_schedule_headings()
+            for day in app.schedule_days:
+                day.set(False)
+            app.schedule_search.set("")
+
     def test_episode_fields_save_and_progress_display(self):
         dialog = ScheduleDialog(self.app)
         dialog.root_dir.set(self.temp.name)

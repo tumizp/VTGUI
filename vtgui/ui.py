@@ -495,9 +495,10 @@ class App(tk.Tk):
         actions = tk.Frame(left, bg=PANEL)
         actions.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
         button(actions, "重试", self.retry_selected).pack(side="left", padx=(0, 6))
-        button(actions, "取消", self.cancel_selected).pack(side="left", padx=(0, 6))
+        button(actions, "取消任务", self.cancel_selected, padx=8).pack(side="left", padx=(0, 6))
         button(actions, "详情", self.run_detail).pack(side="left")
-        button(actions, "清空", self.clear_run_history, padx=8).pack(side="right")
+        self.clear_history_button = button(left, "清空执行记录", self.clear_run_history, pady=4)
+        self.clear_history_button.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 8))
         terminal_head = tk.Frame(right, bg=PANEL)
         terminal_head.grid(row=0, column=0, sticky="ew", padx=12, pady=9)
         label(terminal_head, "TERMINAL", 10, ACCENT).pack(side="left")
@@ -760,15 +761,15 @@ class App(tk.Tk):
         return self.store.run(selected[0]) if selected else None
 
     def clear_run_history(self):
-        if not messagebox.askyesno("清空执行记录", "清空所有已完成和失败的执行记录？包括最近 300 条之外的记录。日志文件会保留。", parent=self):
+        if not messagebox.askyesno("清空执行记录", "永久删除已完成、失败、已取消和已中断的全部执行记录？包括最近 300 条之外的记录。等待中和执行中的任务会继续，日志文件会保留。", parent=self):
             return
-        self.store.write("DELETE FROM runs WHERE status IN ('completed', 'failed')")
+        self.store.write("DELETE FROM runs WHERE status IN ('completed', 'failed', 'cancelled', 'interrupted')")
         if self.selected_run and self.store.run(self.selected_run) is None:
             self.selected_run = None
             self.log_end = 0
             self.clear_terminal()
         self.refresh()
-        self.status.configure(text="已清空所有已完成和失败的执行记录。")
+        self.status.configure(text="已清空所有已结束任务的执行记录。")
 
     def retry_selected(self):
         if run := self.selected():

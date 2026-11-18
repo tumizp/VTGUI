@@ -38,11 +38,12 @@ class UITests(unittest.TestCase):
                     )
                 with patch.object(self.app, "store", store), patch("vtgui.ui.messagebox.askyesno", side_effect=[False, True]):
                     self.app.selected_run = "0"
-                    self.app.clear_run_history()
+                    self.app.clear_history_button.invoke()
                     self.assertEqual(store.rows("SELECT COUNT(*) AS n FROM runs")[0]["n"], len(statuses))
-                    self.app.clear_run_history()
+                    self.app.clear_history_button.invoke()
+                    self.assertEqual(set(self.app.runs_tree.get_children()), {"302", "303"})
                     self.assertIsNone(self.app.selected_run)
-                    self.assertCountEqual([r["status"] for r in store.rows("SELECT status FROM runs")], statuses[-4:])
+                    self.assertCountEqual([r["status"] for r in store.rows("SELECT status FROM runs")], ["queued", "running"])
             finally:
                 store.db.close()
                 self.app.refresh()

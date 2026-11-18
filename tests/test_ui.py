@@ -25,6 +25,28 @@ class UITests(unittest.TestCase):
         cls.store.db.close()
         cls.temp.cleanup()
 
+    def test_clear_run_history(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder))
+            try:
+                statuses = ["completed"] * 301 + ["failed", "queued", "running", "cancelled", "interrupted"]
+                job = json.dumps({**DEFAULTS, "name": "清空记录测试"})
+                with store.db:
+                    store.db.executemany(
+                        "INSERT INTO runs(id,job,status,origin,created,attempt,available) VALUES(?,?,?,'test','',0,0)",
+                        [(str(i), job, status) for i, status in enumerate(statuses)],
+                    )
+                with patch.object(self.app, "store", store), patch("vtgui.ui.messagebox.askyesno", side_effect=[False, True]):
+                    self.app.selected_run = "0"
+                    self.app.clear_run_history()
+                    self.assertEqual(store.rows("SELECT COUNT(*) AS n FROM runs")[0]["n"], len(statuses))
+                    self.app.clear_run_history()
+                    self.assertIsNone(self.app.selected_run)
+                    self.assertCountEqual([r["status"] for r in store.rows("SELECT status FROM runs")], statuses[-4:])
+            finally:
+                store.db.close()
+                self.app.refresh()
+
     def test_terminal_and_controls_fit_minimum_window(self):
         self.app.geometry("1100x780")
         self.app.update()

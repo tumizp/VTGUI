@@ -249,6 +249,27 @@ class EpisodeTests(unittest.TestCase):
         resumed = self.engine.submit_schedule(ident)
         self.assertEqual(self.store.run(resumed)["episode"], 22)
 
+    def test_missing_episode_without_postprocessing_retries_without_advancing(self):
+        spec = self.spec(episode_start="07", episode_total=8, episodes_per_trigger=2)
+        spec["job"].update(command="poetry run vt dl -w S01E{episode} -opcc FRIDAY https://example.test/5328",
+                           retries=1, retry_delay=1)
+        ident = self.store.save_schedule(spec)
+        saved = self.store.schedules()[0]
+        first = self.engine.submit_schedule(ident)
+        argv = [sys.executable, "-u", "-c",
+                "print('FRIDAY : Found 6 episodes'); print('Titles : Total Episodes: 6'); print('FRIDAY : Processed all titles!')"]
+        spawn = self.engine._spawn
+        with patch.object(self.engine, "_spawn", side_effect=lambda job, run_id: spawn({**job, "argv": argv}, run_id)):
+            self.engine._run(first)
+            retry = self.queued()[0]
+            self.assertEqual((retry["episode"], retry["attempt"]), (7, 1))
+            self.engine._run(retry["id"])
+        self.assertFalse(self.queued())
+        self.assertEqual(self.store.episode_progress(saved), 7)
+        runs = self.store.rows("SELECT status,code,episode,message FROM runs ORDER BY rowid")
+        self.assertEqual([(r["status"], r["code"], r["episode"], r["message"]) for r in runs],
+                         [("failed", 0, 7, "退出码 0；当前集未更新")] * 2)
+
     def test_cancel_running_episode_stops_sequence(self):
         spec = self.real_spec("import time; print('{episode}', flush=True); time.sleep(30)", episodes_per_trigger=3)
         first = self.engine.submit_schedule(spec["id"])

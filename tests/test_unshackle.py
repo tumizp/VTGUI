@@ -8,10 +8,27 @@ import unittest
 from unittest.mock import patch
 
 from vtgui.core import DEFAULTS, Engine, Store
-from vtgui.projects import FinalOutputs, project_name
+from vtgui.projects import FinalOutputs, download_command, project_name
 
 
 class OutputTests(unittest.TestCase):
+    def test_download_command_recognition(self):
+        for command in (
+            "poetry run vt dl -w S01E7 -opcc FRIDAY https://example.test/5328",
+            "uv run unshackle dl -w S01E07 Example url",
+            '"E:\\Project Space\\.venv\\Scripts\\vt.exe" dl Example url',
+            "& 'E:\\Project Space\\unshackle.exe' dl Example url",
+            "python -m vinetrimmer dl Example url",
+        ):
+            with self.subTest(command=command):
+                self.assertTrue(download_command({"command": command}))
+        for command in ("echo hello", "vt --help", "vt dl --help", "unshackle dl --list Example url",
+                        'python -c "print(\'vt dl\')"', 'echo "vt dl"'):
+            with self.subTest(command=command):
+                self.assertFalse(download_command({"command": command}))
+        self.assertTrue(download_command({"argv": [r"E:\Project Space\vt.exe", "dl", "Example"]}))
+        self.assertFalse(download_command({"command": "vt dl Example", "argv": ["python", "script.py"]}))
+
     def test_split_ansi_unicode_and_final_line(self):
         with tempfile.TemporaryDirectory() as temp:
             outputs = FinalOutputs(temp)

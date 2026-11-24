@@ -3,10 +3,27 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import shlex
 
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 FINAL = re.compile(r"^===VT_FINAL_(DIR|FILE)===\s+(.+)$")
+
+
+def download_command(job: dict) -> bool:
+    """Recognize downloader entry points without interpreting shell code."""
+    try:
+        tokens = job.get("argv") or shlex.split(job.get("command", ""), posix=False)
+    except ValueError:
+        return False
+    tokens = [token.strip("\"'") for token in tokens]
+    for index, token in enumerate(tokens[:-1]):
+        executable = token.replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if executable in {"vt", "vt.exe", "vinetrimmer", "unshackle", "unshackle.exe"} and tokens[index + 1] == "dl":
+            # These modes intentionally do not produce media files.
+            return not any(option in {"--help", "-h", "--list", "--list-titles", "--list-tracks", "--keys", "--skip-dl"}
+                           for option in tokens[index + 2:])
+    return False
 
 
 def project_name(root: str) -> str:

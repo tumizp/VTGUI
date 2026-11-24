@@ -119,6 +119,25 @@ class RenameTests(unittest.TestCase):
         self.assertEqual((collision / "Season.S02/earlier.srt").read_bytes(), b"older-subtitle")
         self.assertFalse(list(self.source.rglob(".vtgui-rename-*")))
 
+    def test_selected_directory_can_merge_into_selected_unchanged_directory(self):
+        target = self.source / "Brother.Sister.S01"
+        target.mkdir()
+        earlier = target / "Brother.Sister.S01E02.mkv"
+        earlier.write_bytes(b"earlier")
+        replaced = target / "Brother.Sister.S01E03.mkv"
+        replaced.write_bytes(b"old")
+        snapshots = {str(folder): folder_snapshot(folder, self.patterns)
+                     for folder in (target, self.folder)}
+        mapping = rename_items(self.source, snapshots, [], self.patterns,
+                               {**self.rules, "rename_season": ""}, self.logs.append)
+
+        self.assertEqual(mapping[str(self.folder)], str(target))
+        self.assertEqual(mapping[str(target)], str(target))
+        self.assertEqual(mapping[str(earlier)], str(earlier))
+        self.assertEqual(earlier.read_bytes(), b"earlier")
+        self.assertEqual(replaced.read_bytes(), b"episode-one")
+        self.assertFalse(self.folder.exists())
+
     def test_empty_existing_directory_can_be_merged(self):
         collision = self.source / "Brother.Sister.S02"
         collision.mkdir()

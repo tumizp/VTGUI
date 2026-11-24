@@ -569,7 +569,7 @@ class App(tk.Tk):
         area.pack(fill="x", pady=(0, 14))
         label(area, "RESULT HOOKS", 10, ACCENT).pack(anchor="w", padx=18, pady=(16, 8))
         label(area, "定时任务完成 → 按任务配置移动       失败 → 延迟重试", 16).pack(anchor="w", padx=18)
-        label(area, "本工具启动的任务直接使用进程退出码。外部历史监听每 2 秒检查一次，只处理新增记录。", 10, MUTED).pack(anchor="w", padx=18, pady=(8, 12))
+        label(area, "下载任务同时检查退出码与新增/更新成品；未更新按失败处理。外部历史监听每 2 秒检查一次，只处理新增记录。", 10, MUTED).pack(anchor="w", padx=18, pady=(8, 12))
         row = tk.Frame(area, bg=PANEL)
         row.pack(fill="x", padx=18, pady=(0, 16))
         self.monitor_var = tk.BooleanVar(value=self.store.settings()["monitor_enabled"])

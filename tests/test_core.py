@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta
 
 from vtgui.core import (DEFAULTS, Engine, InstanceLock, Store, file_snapshot,
@@ -214,6 +215,31 @@ class CoreTests(unittest.TestCase):
                 log = (self.store.logs / f"{ident}.log").read_text(encoding="utf-8")
                 self.assertIn("失败 · 退出码 0；当前集未更新", log)
                 self.assertEqual(old.read_bytes(), b"previous")
+                self.assertFalse((self.base / "library").exists())
+
+    def test_download_without_postprocessing_requires_updated_output(self):
+        source = self.root / "downloads"
+        source.mkdir()
+        old = source / "previous.mkv"
+        old.write_bytes(b"previous")
+        spawn = self.engine._spawn
+        for script, expected in (
+            ("print('FRIDAY : Found 6 episodes'); print('FRIDAY : Processed all titles!')", "failed"),
+            ("print('===VT_FINAL_FILE=== downloads/previous.mkv')", "failed"),
+            ("from pathlib import Path; Path('downloads/new.mkv').write_bytes(b'new')", "completed"),
+            ("from pathlib import Path; Path('downloads/previous.mkv').write_bytes(b'updated media')", "completed"),
+        ):
+            with self.subTest(script=script):
+                fixture = self.job(script)
+                job = {**fixture, "command": "poetry run vt dl -w S01E7 -opcc FRIDAY https://example.test/5328"}
+                job.pop("argv")
+                ident = self.engine.submit(job)
+                with patch.object(self.engine, "_spawn", side_effect=lambda job, ident: spawn(fixture, ident)):
+                    self.engine._run(ident)
+                run = self.store.run(ident)
+                self.assertEqual((run["status"], run["code"]), (expected, 0))
+                self.assertEqual(run["message"], "退出码 0" + ("；当前集未更新" if expected == "failed" else ""))
+                self.assertTrue(old.exists())
                 self.assertFalse((self.base / "library").exists())
 
     def test_move_collision_and_path_escape(self):

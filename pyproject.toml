@@ -1,6 +1,6 @@
 [project]
 name = "vtgui-console"
-version = "1.9.2"
+version = "1.9.3"
 description = "Independent DRMLAB and unshackle scheduler and command console"
 requires-python = ">=3.11"
 dependencies = []

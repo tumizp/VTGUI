@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 
 from .archive import archive_plan, folder_snapshot, move_files, move_folders
-from .projects import FinalOutputs
+from .projects import FinalOutputs, download_command
 from .rename import RENAME_DEFAULTS, RenameError, file_identity, rename_enabled, rename_items, restore_unmoved, validate_rename
 from .telegram import TELEGRAM_DEFAULTS, TelegramNotifier, validate_telegram
 
@@ -828,7 +828,7 @@ class Engine:
                                    destination=destination if job["move_enabled"] else None,
                                    folder_move=job["move_mode"] == "folders", selected_files=files,
                                    preserved_names=preserved_names, merged_directories=merged_directories)
-            files = [mapping[p] for p in files]
+            files = list(dict.fromkeys(mapping[p] for p in files))
             loose = [mapping[p] for p in loose]
             snapshots = {mapping[name]: folder_snapshot(Path(mapping[name]), job["patterns"], require_media=False) for name in snapshots}
             if not job["move_enabled"]:
@@ -844,7 +844,7 @@ class Engine:
         if renaming:
             restore_unmoved(source, mapping, job["patterns"], log, self.store.logs / f"{ident or uuid.uuid4().hex}.unmoved.rename.json",
                             merged_directories=merged_directories)
-        return count, len(folders) + len(loose)
+        return count, len(snapshots) + len(loose)
 
     def _run(self, ident: str):
         run = self.store.run(ident)
@@ -869,7 +869,9 @@ class Engine:
                 log(f"[{stamp()}] {job['name']}\n目录：{job['root']}\n$ {job['command']}\n\n")
                 job = validate_job(job)
                 source = resolved(job["root"], job["source"])
-                before = file_snapshot(source, job["patterns"]) if job["move_enabled"] or rename_enabled(job) else {}
+                postprocess = job["move_enabled"] or rename_enabled(job)
+                check_outputs = postprocess or download_command(job)
+                before = file_snapshot(source, job["patterns"]) if check_outputs else {}
                 if job.get("move_only"):
                     if not job["move_enabled"]:
                         raise ValueError("归档任务未启用移动")
@@ -913,10 +915,10 @@ class Engine:
                     else:
                         status = "completed" if code == 0 else "failed"
                         message = f"退出码 {code}"
-                    if status == "completed" and (job["move_enabled"] or rename_enabled(job)):
+                    if status == "completed" and check_outputs:
                         after = file_snapshot(source, job["patterns"])
                         files = sorted(p for p in after if p not in before or
-                                       ((job["move_mode"] == "folders" or rename_enabled(job)) and after[p] != before[p]))
+                                       ((not postprocess or job["move_mode"] == "folders" or rename_enabled(job)) and after[p] != before[p]))
                         if outputs.seen:
                             matched = outputs.select(files)
                             log(f"完成路径标记：识别 {len(outputs.directories)} 个目录、{len(outputs.files)} 个文件；"
@@ -925,10 +927,13 @@ class Engine:
                         if files and not self.cancel_event.wait(1):
                             stable = file_snapshot(source, job["patterns"])
                             files = [p for p in files if stable.get(p) == after[p]]
-                            postprocess_started = True
-                            count, total = self._archive(job, files, log, ident)
-                            action = "先重命名后移动" if rename_enabled(job) and job["move_enabled"] else "重命名" if rename_enabled(job) else "移动"
-                            message += f"；{action} {count}/{total} 个项目，详见日志"
+                            if not files:
+                                status, message = "failed", message + "；当前集未更新"
+                            elif postprocess:
+                                postprocess_started = True
+                                count, total = self._archive(job, files, log, ident)
+                                action = "先重命名后移动" if rename_enabled(job) and job["move_enabled"] else "重命名" if rename_enabled(job) else "移动"
+                                message += f"；{action} {count}/{total} 个项目，详见日志"
                         else:
                             status, message = "failed", message + "；当前集未更新"
                         if self.cancel_event.is_set():

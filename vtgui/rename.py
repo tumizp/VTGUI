@@ -143,9 +143,26 @@ def rename_items(source: Path, snapshots: dict[str, dict], loose: list[str], pat
     basenames = {}
     preserved_names = preserved_names or set()
     explicit_names = explicit_names or {}
+    for path, data in entries.items():
+        basenames[path] = explicit_names.get(_key(path)) or (path.name if _key(path) in preserved_names else renamed_name(path.name, rules, data[0] == "dir"))
+    roots = {Path(name) for name in snapshots}
+    stationary_roots = {_key(path): path for path in roots if basenames[path] == path.name}
+    merge_roots = set()
+    for path in roots:
+        target = stationary_roots.get(_key(source / basenames[path]))
+        if target is not None and target != path:
+            basenames[path] = target.name
+            merge_roots.add(target)
+    # Use the same merge path as for an existing directory outside the selection.
+    retained_mapping = {}
+    for name, snapshot in snapshots.items():
+        root = Path(name)
+        if root in merge_roots:
+            retained_mapping.update((str(root / relative), str(root / relative))
+                                    for relative in snapshot)
+    entries = {path: data for path, data in entries.items() if str(path) not in retained_mapping}
     for path, data in sorted(entries.items(), key=lambda item: len(item[0].parts)):
         parent = mapping.get(path.parent, path.parent)
-        basenames[path] = explicit_names.get(_key(path)) or (path.name if _key(path) in preserved_names else renamed_name(path.name, rules, data[0] == "dir"))
         valid_name(basenames[path])
         target = parent / basenames[path]
         key = _key(target)
@@ -175,7 +192,7 @@ def rename_items(source: Path, snapshots: dict[str, dict], loose: list[str], pat
     # Ordinary target directories can merge; occupied files are skipped by the mover.
     if destination is not None:
         destination = destination.resolve()
-        check = [mapping[Path(p)] for p in snapshots] if folder_move else []
+        check = [mapping[Path(p)] for p in snapshots if Path(p) not in merge_roots] if folder_move else []
         for target in check:
             archive_target = destination / target.relative_to(source)
             if archive_target.exists() or archive_target.is_symlink():
@@ -261,6 +278,8 @@ def rename_items(source: Path, snapshots: dict[str, dict], loose: list[str], pat
             if expected[0] == "file" and (stat.st_size, stat.st_mtime_ns) != tuple(expected[1:]):
                 raise OSError(f"重命名时文件内容发生变化：{target}")
         for folder in snapshots:
+            if Path(folder) in merge_roots:
+                continue
             renamed_folder = mapping[Path(folder)]
             actual = folder_snapshot(renamed_folder, patterns, require_media=False)
             expected_paths = {str(mapping[p].relative_to(renamed_folder)) for p in entries if p == Path(folder) or Path(folder) in p.parents}
@@ -306,7 +325,7 @@ def rename_items(source: Path, snapshots: dict[str, dict], loose: list[str], pat
     for old, new in mapping.items():
         if old != new:
             log(f"已重命名：{old} → {new}\n")
-    return {str(p): str(target) for p, target in mapping.items()}
+    return retained_mapping | {str(p): str(target) for p, target in mapping.items()}
 
 
 def restore_unmoved(source: Path, mapping: dict[str, str], patterns: str, log, journal: Path,
@@ -318,7 +337,7 @@ def restore_unmoved(source: Path, mapping: dict[str, str], patterns: str, log, j
     """
     source = source.resolve()
     inverse = {Path(new): Path(old) for old, new in mapping.items()}
-    roots = [Path(new) for old, new in mapping.items() if Path(old).parent == source]
+    roots = dict.fromkeys(Path(new) for old, new in mapping.items() if Path(old).parent == source)
     snapshots, loose = {}, []
     retained_directories = {Path(p) for p in (merged_directories or ())}
     for root in roots:

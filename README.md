@@ -4,7 +4,7 @@
 
 ## 启动
 
-**安装包（推荐分享）**：从 [GitHub Releases](https://github.com/tumizp/VTGUI/releases/latest) 下载 `VTGUI-1.9.2-Setup-x64.exe`，发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
+**安装包（推荐分享）**：从 [GitHub Releases](https://github.com/tumizp/VTGUI/releases/latest) 下载 `VTGUI-1.9.3-Setup-x64.exe`，发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
 
 安装包只含 GUI 和运行库，不含分享者的配置、日志、定时任务或 DRMLAB。DRMLAB 及其依赖仍需自行准备。升级前先正常退出 GUI，运行新安装包即可覆盖安装；从 Windows“已安装的应用”或开始菜单卸载，均保留 `%LOCALAPPDATA%\VTGUI` 中的配置和日志，不删除 DRMLAB 及下载文件。安装包未进行数字签名。
 
@@ -138,7 +138,7 @@ cd
 
 升级到 1.4.0 后，旧全局移动配置会移除，定时任务中已经保存的配置保留；旧等待队列里非定时任务继承的移动/重命名会关闭。定时任务和其重试仍保留本任务的处理规则。
 
-- **失败重试**：非零退出码、启动异常或超时视为失败。配置移动或重命名的任务即使退出码为 `0`，若没有可确认的新增/更新成品，也按失败处理，原因显示“当前集未更新”；逐集进度保持当前集，并按配置重试。支持 0–20 次重试及 1–86400 秒间隔，每次尝试独立保留日志。`0` 表示关闭自动重试。
+- **失败重试**：非零退出码、启动异常或超时视为失败。`vt dl` / `unshackle dl` 下载任务（包括 Poetry、uv、可执行文件路径和 `python -m vinetrimmer` 调用）即使未开启移动或重命名，也会检查成品目录的新增/更新文件；退出码为 `0` 但没有可确认的成品时，按失败处理，原因显示“当前集未更新”。仅有 `Processed all titles!` 或完成路径标记不能证明本集已更新。成品目录默认 `downloads`，自定义输出位置需同步配置；帮助、列表、仅密钥等明确不产生成品的模式保留退出码判定。其他命令配置移动或重命名时也执行成品检查；逐集进度在失败时保持当前集，并按配置重试。支持 0–20 次重试及 1–86400 秒间隔，每次尝试独立保留日志。`0` 表示关闭自动重试。
 - **超时**：设为 `0` 不限制；否则超时后终止任务进程树，按失败处理。
 - **手动取消**：终止任务进程树，不触发自动重试。
 - **成功移动**：定时任务开启移动后，仅在退出码为 `0`、重命名（如配置）成功后进行。“剧集文件夹”模式会处理本次有新增或更新成品的一级剧集目录及其中的集数、字幕、封面和子目录；无关目录保持原位，根目录散文件单独移动。
@@ -234,7 +234,7 @@ python main.py --data-dir E:\VTGUI-Data
 
 推送到 `main`、提交面向 `main` 的 Pull Request，或在 Actions 中手动运行 **Windows packages and GHCR archive**，会在 Windows x64 上执行源码/UI 测试、构建程序与离线安装包、验证打包程序，以及验证安装、升级和卸载。全部通过后，Actions 的 Artifacts 提供安装包、便携 ZIP、构建信息与 SHA-256 校验文件，保留 30 天。
 
-`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.9.2`、`1.9.2` 这样的归档标签，以及附带下载文件的 GitHub Release。普通 `main` 构建不会发布到 Releases；正式发布需推送与 `pyproject.toml` 版本一致的标签。
+`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.9.3`、`1.9.3` 这样的归档标签，以及附带下载文件的 GitHub Release。普通 `main` 构建不会发布到 Releases；正式发布需推送与 `pyproject.toml` 版本一致的标签。
 
 GHCR 中保存的是 Windows 文件的 OCI 归档，使用 ORAS 取回后在 Windows 运行。源码和正式版本安装包通过公开仓库及 Releases 提供；GHCR 归档保持私有，并通过来源标注关联仓库。流水线使用自动提供的 `GITHUB_TOKEN`，无需另配上传密钥。私有归档的本机下载需要有包读取权限的 GitHub 登录及 `read:packages` 令牌：
 
@@ -247,8 +247,8 @@ oras pull ghcr.io/<GitHub用户名>/<小写仓库名>:latest --output .\VTGUI-do
 发布新版时，先同步修改 `pyproject.toml` 和 `vtgui/__init__.py` 中的三段数字版本并提交，再推送匹配标签，例如：
 
 ```powershell
-git tag v1.9.2
-git push origin v1.9.2
+git tag v1.9.3
+git push origin v1.9.3
 ```
 
 每次构建的 Actions 摘要会列出实际 GHCR 引用和已校验的 digest。可使用 `@sha256:...` 引用取回该次构建的确定版本。便携 ZIP 解压后运行 `VTGUI/VTGUI.exe`，保留整个文件夹。

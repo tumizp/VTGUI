@@ -1001,7 +1001,7 @@ class InstanceLock:
                 msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
             except OSError:
                 self.handle.close()
-                raise RuntimeError("VTGUI 已在运行，请检查已打开或最小化的窗口。") from None
+                raise RuntimeError("VTGUI 已在运行，请检查已打开的窗口或系统托盘，双击托盘图标可恢复窗口。") from None
         else:
             import fcntl
             try:

@@ -1,9 +1,11 @@
 """Widget integration checks; no DRMLAB commands are run."""
 import json
+import queue
 from pathlib import Path
 import tempfile
+import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from vtgui.core import DEFAULTS, Engine, Store
 from vtgui.ui import App, ScheduleDialog
@@ -58,6 +60,88 @@ class UITests(unittest.TestCase):
             bottom = widget.winfo_rooty() + widget.winfo_height()
             self.assertLessEqual(bottom, self.app.winfo_rooty() + self.app.winfo_height())
         self.assertGreater(self.app.terminal.winfo_height(), 50)
+
+    def test_close_hides_window_and_keeps_engine_running(self):
+        tray = Mock(events=queue.Queue())
+        tray.start.return_value = True
+        self.app.engine.active = "running-task"
+        try:
+            with patch("vtgui.ui.os.name", "nt"), patch.object(self.app, "tray", tray), \
+                    patch.object(self.engine, "close") as stop, patch("vtgui.ui.messagebox.askyesno") as confirm:
+                self.app.on_close()
+                self.assertEqual(self.app.state(), "withdrawn")
+                self.assertFalse(self.app.closing)
+                stop.assert_not_called()
+                confirm.assert_not_called()
+                tray.events.put("restore")
+                self.app.pump()
+                self.app.update()
+                self.assertEqual(self.app.state(), "normal")
+                self.assertFalse(self.app.closing)
+        finally:
+            self.app.engine.active = None
+            self.app.restore_window()
+
+    def test_tray_failure_keeps_window_accessible(self):
+        tray = Mock(events=queue.Queue(), error="Explorer unavailable")
+        tray.start.return_value = False
+        with patch("vtgui.ui.os.name", "nt"), patch.object(self.app, "tray", tray), \
+                patch("vtgui.ui.messagebox.showwarning") as warning:
+            self.app.on_close()
+            self.assertNotEqual(self.app.state(), "withdrawn")
+            self.assertFalse(self.app.closing)
+            warning.assert_called_once()
+
+    def test_cancel_exit_from_tray_restores_window_and_preserves_engine(self):
+        tray = Mock(events=queue.Queue())
+        tray.start.return_value = True
+        self.app.engine.active = "running-task"
+        try:
+            with patch("vtgui.ui.os.name", "nt"), patch.object(self.app, "tray", tray), \
+                    patch.object(self.engine, "close") as stop, \
+                    patch("vtgui.ui.messagebox.askyesno", return_value=False) as confirm:
+                self.app.on_close()
+                tray.events.put("exit")
+                self.app.pump()
+                self.assertNotEqual(self.app.state(), "withdrawn")
+                self.assertFalse(self.app.closing)
+                confirm.assert_called_once()
+                stop.assert_not_called()
+        finally:
+            self.app.engine.active = None
+            self.app.restore_window()
+
+    def test_lost_tray_restores_hidden_window(self):
+        tray = Mock(events=queue.Queue())
+        self.app.withdraw()
+        with patch.object(self.app, "tray", tray):
+            tray.events.put("unavailable")
+            self.app.pump()
+            self.assertNotEqual(self.app.state(), "withdrawn")
+
+    def test_explicit_exit_stops_engine_and_removes_tray(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder))
+            engine = Engine(store)
+            app = App(store, engine)
+            tray = Mock(events=queue.Queue())
+            try:
+                with patch.object(app, "tray", tray), patch.object(engine, "close") as stop, \
+                        patch.object(app, "destroy", wraps=app.destroy) as destroy:
+                    app.exit_button.invoke()
+                    for _ in range(100):
+                        if destroy.called:
+                            break
+                        app.update()
+                        time.sleep(.01)
+                    self.assertTrue(destroy.called)
+                    stop.assert_called_once()
+                    tray.stop.assert_called_once()
+            finally:
+                if not app.closing:
+                    app.destroy()
+                engine.close()
+                store.db.close()
 
     def test_telegram_settings_save_mask_and_unsaved_test(self):
         values = {"telegram_bot_token": "123456:TEST_secret-token", "telegram_chat_ids": "123, -100456,123"}

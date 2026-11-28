@@ -17,6 +17,7 @@ from .core import (DEFAULTS, STATUSES, Engine, Store, next_occurrence, resolved,
                    validate_job, episodic, normalize_roots, schedule_times)
 from .rename import renamed_name, validate_rename, RenameError
 from .telegram import TELEGRAM_DEFAULTS, validate_telegram
+from .tray import WindowsTray
 
 BG = "#0d1220"
 PANEL = "#151e30"
@@ -351,6 +352,8 @@ class App(tk.Tk):
         self.selected_run = None
         self.log_end = 0
         self.closing = False
+        self.tray = WindowsTray(f"VTGUI {__version__} · 双击显示主窗口，右键退出")
+        self._tray_window_state = "normal"
         self.page_name = "work"
         self._style()
         self._layout()
@@ -390,8 +393,10 @@ class App(tk.Tk):
         bottom = tk.Frame(sidebar, bg="#101827")
         bottom.pack(side="bottom", fill="x", padx=22, pady=24)
         label(bottom, "●  本地调度引擎", 10, ACCENT).pack(anchor="w")
-        label(bottom, "运行时调度 · 串行执行\n关闭窗口将停止调度\n配置与日志独立存储", 9, MUTED, justify="left").pack(anchor="w", pady=12)
+        label(bottom, "运行时调度 · 串行执行\n关闭窗口后在托盘运行\n双击托盘图标恢复窗口", 9, MUTED, justify="left").pack(anchor="w", pady=12)
         button(bottom, "打开数据目录 ↗", lambda: os.startfile(self.store.folder)).pack(anchor="w")
+        self.exit_button = button(bottom, "退出程序", self.request_exit)
+        self.exit_button.pack(anchor="w", pady=(10, 0))
         label(bottom, f"VTGUI  /  v{__version__}", 9, MUTED).pack(anchor="w", pady=(18, 0))
         main = tk.Frame(self, bg=BG)
         main.pack(side="left", fill="both", expand=True, padx=28, pady=24)
@@ -1004,6 +1009,17 @@ class App(tk.Tk):
     def pump(self):
         if self.closing:
             return
+        while True:
+            try:
+                action = self.tray.events.get_nowait()
+            except queue.Empty:
+                break
+            if action == "exit":
+                self.request_exit()
+            elif action in ("restore", "unavailable"):
+                self.restore_window()
+        if self.closing:
+            return
         changed = False
         batch = []
         for _ in range(800):
@@ -1034,6 +1050,37 @@ class App(tk.Tk):
     def on_close(self):
         if self.closing:
             return
+        if os.name != "nt":
+            self.request_exit()
+            return
+        if not self.tray.start():
+            messagebox.showwarning("无法缩小到系统托盘", f"{self.tray.error}\n\n窗口将保持打开。需要退出时，请点击左下角“退出程序”。", parent=self)
+            return
+        if self.state() != "withdrawn":
+            self._tray_window_state = "zoomed" if self.state() == "zoomed" else "normal"
+        self.status.configure(text="已缩小到系统托盘，任务和定时调度继续运行。双击托盘图标恢复窗口。")
+        self.withdraw()
+
+    def restore_window(self):
+        if self.closing:
+            return
+        self.deiconify()
+        self.state(self._tray_window_state)
+        self.lift()
+        self.focus_force()
+
+    def destroy(self):
+        self.closing = True
+        if hasattr(self, "tray"):
+            self.tray.stop()
+        for timer in self.tk.call("after", "info"):
+            self.after_cancel(timer)
+        super().destroy()
+
+    def request_exit(self):
+        if self.closing:
+            return
+        self.restore_window()
         queued = self.store.rows("SELECT COUNT(*) n FROM runs WHERE status='queued'")[0]["n"]
         if self.engine.active or queued:
             if not messagebox.askyesno("退出 VTGUI", "退出将终止当前任务并停止调度。等待队列会保留到下次启动。是否退出？", parent=self):

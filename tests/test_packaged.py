@@ -13,6 +13,77 @@ from vtgui.core import DEFAULTS, Store
 
 @unittest.skipUnless(os.environ.get("VTGUI_TEST_EXE"), "Set VTGUI_TEST_EXE to test a built executable")
 class PackagedTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows notification area only")
+    def test_close_to_tray_keeps_packaged_queue_running(self):
+        import ctypes
+        from ctypes import wintypes
+        from vtgui.tray import WM_TRAY, WM_LBUTTONDBLCLK
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowW.restype = wintypes.HWND
+        if not user32.FindWindowW("Shell_TrayWnd", None):
+            self.skipTest("Windows Explorer notification area is not running")
+        enum_proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows.argtypes = [enum_proc, wintypes.LPARAM]
+        user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+
+        def find_window(pid, tray=False):
+            found = []
+
+            @enum_proc
+            def visit(hwnd, _):
+                owner = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+                if owner.value == pid:
+                    title = ctypes.create_unicode_buffer(256)
+                    kind = ctypes.create_unicode_buffer(256)
+                    user32.GetWindowTextW(hwnd, title, 256)
+                    user32.GetClassNameW(hwnd, kind, 256)
+                    matches = kind.value.startswith("VTGUI.Tray.") if tray else title.value.startswith("VTGUI ·")
+                    if matches:
+                        found.append(hwnd)
+                return True
+
+            user32.EnumWindows(visit, 0)
+            return found[0] if found else None
+
+        def wait_for(condition):
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline:
+                self.assertIsNone(proc.poll(), "Packaged GUI exited unexpectedly")
+                result = condition()
+                if result:
+                    return result
+                time.sleep(.05)
+            self.fail("Timed out waiting for packaged tray operation")
+
+        exe = Path(os.environ["VTGUI_TEST_EXE"]).resolve()
+        with tempfile.TemporaryDirectory(prefix="VTGUI Tray 中文 ") as temp:
+            root = Path(temp)
+            store = Store(root / "data")
+            proc = subprocess.Popen([str(exe), "--data-dir", str(root / "data")], creationflags=subprocess.CREATE_NO_WINDOW)
+            try:
+                hwnd = wait_for(lambda: find_window(proc.pid))
+                wait_for(lambda: user32.IsWindowVisible(hwnd))
+                user32.PostMessageW(hwnd, 0x0010, 0, 0)  # Close the real packaged window.
+                wait_for(lambda: not user32.IsWindowVisible(hwnd))
+                ident = store.enqueue({**DEFAULTS, "root": str(root), "name": "托盘后台队列",
+                                       "command": "echo TRAY_QUEUE_OK>tray-task.txt"})
+                wait_for(lambda: store.run(ident)["status"] == "completed")
+                self.assertEqual((root / "tray-task.txt").read_text().strip(), "TRAY_QUEUE_OK")
+                tray_hwnd = wait_for(lambda: find_window(proc.pid, tray=True))
+                user32.PostMessageW(tray_hwnd, WM_TRAY, 1, WM_LBUTTONDBLCLK)
+                wait_for(lambda: user32.IsWindowVisible(hwnd))
+            finally:
+                proc.terminate()
+                proc.wait(timeout=10)
+                store.db.close()
+
     def test_extra_time_triggers_packaged_scheduler(self):
         exe = Path(os.environ["VTGUI_TEST_EXE"]).resolve()
         with tempfile.TemporaryDirectory(prefix="VTGUI Extra Time 中文 ") as temp:

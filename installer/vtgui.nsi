@@ -26,6 +26,8 @@ ShowInstDetails show
 ShowUninstDetails show
 
 !define MUI_ABORTWARNING
+!define MUI_ICON "..\assets\vtgui.ico"
+!define MUI_UNICON "..\assets\vtgui.ico"
 !define MUI_WELCOMEPAGE_TITLE "欢迎安装 VTGUI ${APP_VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "DRMLAB / unshackle 独立任务工作台。$\r$\n$\r$\n本安装包包含 GUI 及运行库，无需安装 Python。$\r$\n$\r$\n请先准备好 DRMLAB / unshackle 及其依赖，安装后在 GUI 中选择 DRMLAB / unshackle 所在目录。$\r$\n$\r$\n升级前请先正常退出 VTGUI。配置、任务和日志会保留。"
 !insertmacro MUI_PAGE_WELCOME

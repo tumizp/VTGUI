@@ -7,6 +7,8 @@ import os
 import queue
 import threading
 
+from .resources import ICON_PATH
+
 
 WM_CLOSE = 0x0010
 WM_DESTROY = 0x0002
@@ -26,6 +28,7 @@ class WindowsTray:
         self._ready = threading.Event()
         self._stopping = threading.Event()
         self._registered = False
+        self._icon_handle = None
 
     def start(self):
         """Return true only after Windows has accepted the notification icon."""
@@ -98,7 +101,12 @@ class WindowsTray:
             self._data.uID = 1
             self._data.uFlags = 1 | 2 | 4  # NIF_MESSAGE | NIF_ICON | NIF_TIP
             self._data.uCallbackMessage = WM_TRAY
-            self._data.hIcon = api.user32.LoadIconW(None, ctypes.c_void_p(32512))
+            self._icon_handle = api.user32.LoadImageW(
+                None, str(ICON_PATH), 1, api.user32.GetSystemMetrics(49),
+                api.user32.GetSystemMetrics(50), 0x0010)  # IMAGE_ICON | LR_LOADFROMFILE
+            if not self._icon_handle:
+                raise OSError(f"无法加载 VTGUI 托盘图标：{ICON_PATH}")
+            self._data.hIcon = self._icon_handle
             self._data.szTip = self.title[:127]
             if not api.shell32.Shell_NotifyIconW(0, ctypes.byref(self._data)):
                 raise OSError("无法创建系统托盘图标，请检查 Windows 资源管理器是否正在运行")
@@ -126,6 +134,9 @@ class WindowsTray:
                 self.hwnd = None
             if api and atom:
                 api.user32.UnregisterClassW(class_name, instance)
+            if api and self._icon_handle:
+                api.user32.DestroyIcon(self._icon_handle)
+                self._icon_handle = None
             self._ready.set()
 
     def _menu(self, hwnd):
@@ -185,7 +196,10 @@ class _WindowsAPI:
                                  wintypes.HWND, wintypes.HMENU, wintypes.HINSTANCE, wintypes.LPVOID], wintypes.HWND),
             "DefWindowProcW": ([wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM], ctypes.c_ssize_t),
             "RegisterWindowMessageW": ([wintypes.LPCWSTR], wintypes.UINT),
-            "LoadIconW": ([wintypes.HINSTANCE, ctypes.c_void_p], wintypes.HICON),
+            "LoadImageW": ([wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT,
+                            ctypes.c_int, ctypes.c_int, wintypes.UINT], wintypes.HANDLE),
+            "GetSystemMetrics": ([ctypes.c_int], ctypes.c_int),
+            "DestroyIcon": ([wintypes.HICON], wintypes.BOOL),
             "PostMessageW": ([wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM], wintypes.BOOL),
             "DestroyWindow": ([wintypes.HWND], wintypes.BOOL),
             "IsWindow": ([wintypes.HWND], wintypes.BOOL),

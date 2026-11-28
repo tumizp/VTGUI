@@ -4,7 +4,7 @@
 
 ## 启动
 
-**安装包（推荐分享）**：从 [GitHub Releases](https://github.com/tumizp/VTGUI/releases/latest) 下载 `VTGUI-1.9.4-Setup-x64.exe`，发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
+**安装包（推荐分享）**：从 [GitHub Releases](https://github.com/tumizp/VTGUI/releases/latest) 下载 `VTGUI-1.9.5-Setup-x64.exe`，发送给其他人即可。双击后按中文向导安装，支持选择安装位置、开始菜单入口及可选桌面快捷方式。适用于 Windows 10/11 x64，离线安装，无需安装 Python，也无需管理员权限。安装后从开始菜单启动 VTGUI，选择接收方自己的 DRMLAB 目录。
 
 安装包只含 GUI 和运行库，不含分享者的配置、日志、定时任务或 DRMLAB。DRMLAB 及其依赖仍需自行准备。升级前先通过“退出程序”结束 GUI（仅关闭窗口仍会在托盘运行），运行新安装包即可覆盖安装；从 Windows“已安装的应用”或开始菜单卸载，均保留 `%LOCALAPPDATA%\VTGUI` 中的配置和日志，不删除 DRMLAB 及下载文件。安装包未进行数字签名。
 
@@ -19,6 +19,10 @@ python main.py
 GUI 的源码运行仅依赖 Python 标准库。DRMLAB 自己所需的 Poetry、虚拟环境和相关二进制工具仍需安装好。可以在“工作区设置 → 检查运行环境”查看路径查找结果。
 
 `RUN.bat` 使用无控制台的 Python 启动 GUI，启动终端会自动退出，不会一直占用窗口。依次查找项目 `.venv` 的 `pythonw.exe`、系统 `pyw.exe`、`pythonw.exe`；没有 Python 时尝试已打包的 EXE。GUI 启动异常仍会弹窗提示，并写入数据目录的 `startup-error.log`。
+
+## 1.9.5 · 托盘 Logo 图标
+
+使用 VTGUI Logo 作为系统托盘、窗口、程序 EXE 以及安装/卸载程序图标；内含多种尺寸以适配任务栏缩放。托盘图标加载失败时保留主窗口并提示，不会隐藏为无图标的后台进程。
 
 ## 1.9.4 · 关闭到系统托盘
 
@@ -243,7 +247,7 @@ python main.py --data-dir E:\VTGUI-Data
 
 推送到 `main`、提交面向 `main` 的 Pull Request，或在 Actions 中手动运行 **Windows packages and GHCR archive**，会在 Windows x64 上执行源码/UI 测试、构建程序与离线安装包、验证打包程序，以及验证安装、升级和卸载。全部通过后，Actions 的 Artifacts 提供安装包、便携 ZIP、构建信息与 SHA-256 校验文件，保留 30 天。
 
-`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.9.4`、`1.9.4` 这样的归档标签，以及附带下载文件的 GitHub Release。普通 `main` 构建不会发布到 Releases；正式发布需推送与 `pyproject.toml` 版本一致的标签。
+`main` 和 `v*` 标签的成功构建另外使用 [ORAS](https://oras.land/docs/) 将同一批 Windows 文件上传至 GHCR，并重新拉取、校验全部文件后发布别名。归档地址为 `ghcr.io/<GitHub用户名>/<小写仓库名>`；`latest` 对应最新成功的 `main` 构建，`sha-<完整提交哈希>` 对应提交，`build-<运行ID>-<重跑次数>` 对应单次构建。版本标签还会产生 `v1.9.5`、`1.9.5` 这样的归档标签，以及附带下载文件的 GitHub Release。普通 `main` 构建不会发布到 Releases；正式发布需推送与 `pyproject.toml` 版本一致的标签。
 
 GHCR 中保存的是 Windows 文件的 OCI 归档，使用 ORAS 取回后在 Windows 运行。源码和正式版本安装包通过公开仓库及 Releases 提供；GHCR 归档保持私有，并通过来源标注关联仓库。流水线使用自动提供的 `GITHUB_TOKEN`，无需另配上传密钥。私有归档的本机下载需要有包读取权限的 GitHub 登录及 `read:packages` 令牌：
 
@@ -256,8 +260,8 @@ oras pull ghcr.io/<GitHub用户名>/<小写仓库名>:latest --output .\VTGUI-do
 发布新版时，先同步修改 `pyproject.toml` 和 `vtgui/__init__.py` 中的三段数字版本并提交，再推送匹配标签，例如：
 
 ```powershell
-git tag v1.9.4
-git push origin v1.9.4
+git tag v1.9.5
+git push origin v1.9.5
 ```
 
 每次构建的 Actions 摘要会列出实际 GHCR 引用和已校验的 digest。可使用 `@sha256:...` 引用取回该次构建的确定版本。便携 ZIP 解压后运行 `VTGUI/VTGUI.exe`，保留整个文件夹。

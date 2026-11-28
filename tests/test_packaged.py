@@ -63,6 +63,8 @@ class PackagedTests(unittest.TestCase):
             self.fail("Timed out waiting for packaged tray operation")
 
         exe = Path(os.environ["VTGUI_TEST_EXE"]).resolve()
+        from vtgui.resources import ICON_PATH
+        self.assertEqual((exe.parent / "_internal" / "assets" / "vtgui.ico").read_bytes(), ICON_PATH.read_bytes())
         with tempfile.TemporaryDirectory(prefix="VTGUI Tray 中文 ") as temp:
             root = Path(temp)
             store = Store(root / "data")

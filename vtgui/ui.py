@@ -18,6 +18,7 @@ from .core import (DEFAULTS, STATUSES, Engine, Store, next_occurrence, resolved,
 from .rename import renamed_name, validate_rename, RenameError
 from .telegram import TELEGRAM_DEFAULTS, validate_telegram
 from .tray import WindowsTray
+from .resources import ICON_PATH
 
 BG = "#0d1220"
 PANEL = "#151e30"
@@ -345,6 +346,8 @@ class App(tk.Tk):
         super().__init__()
         self.store, self.engine = store, engine
         self.title(f"VTGUI · 下载任务工作台  {__version__}")
+        if os.name == "nt":
+            self.iconbitmap(default=str(ICON_PATH))
         self.geometry("1380x940")
         self.minsize(1100, 780)
         self.configure(bg=BG)
